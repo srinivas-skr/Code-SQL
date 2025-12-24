@@ -1,86 +1,83 @@
 /* =============================================================
-   PART 1: DDL (Data Definition Language) - The Structure
-   * Auto-Committed (Cannot Rollback)
-   * Commands: CREATE, ALTER, DROP, TRUNCATE, RENAME
+   PART 1: DDL - Creating Tables & Constraints
+   The Rules of the House
    ============================================================= */
 
--- 1. Create a Table (The Blueprint)
-CREATE TABLE emp (
-    empno    NUMBER(4) PRIMARY KEY, -- Constraint: Unique + Not Null
-    ename    VARCHAR2(10),
-    job      VARCHAR2(9),
-    mgr      NUMBER(4),
-    hiredate DATE,
-    sal      NUMBER(7,2),
-    comm     NUMBER(7,2),
-    deptno   NUMBER(2)
+-- 1. Create Table with Inline Constraints (Simple Method)
+CREATE TABLE dept (
+    deptno NUMBER(2) PRIMARY KEY, -- Primary Key (Unique + Not Null)
+    dname  VARCHAR2(14) NOT NULL, -- Not Null (Must have value)
+    loc    VARCHAR2(13)
 );
 
--- 2. Alter Table (The Renovation)
--- A. Add a new column
-ALTER TABLE emp ADD gender VARCHAR2(1);
+-- 2. Create Table with Out-of-Line Constraints (Professional Method)
+CREATE TABLE emp (
+    empno    NUMBER(4),
+    ename    VARCHAR2(10),
+    job      VARCHAR2(9),
+    deptno   NUMBER(2),
+    
+    -- Defining Primary Key
+    CONSTRAINT pk_emp PRIMARY KEY (empno),
+    
+    -- Defining Foreign Key (Links to DEPT table)
+    -- "ON DELETE CASCADE" means if Dept is deleted, Employee is deleted too.
+    CONSTRAINT fk_emp_dept FOREIGN KEY (deptno) 
+        REFERENCES dept(deptno) ON DELETE CASCADE,
+        
+    -- Defining Unique Key (No duplicates allowed)
+    CONSTRAINT uk_ename UNIQUE (ename),
+    
+    -- Defining Check Constraint (Business Rule)
+    CONSTRAINT chk_job CHECK (job IN ('CLERK', 'MANAGER', 'SALESMAN'))
+);
 
--- B. Modify an existing column (Change data type or size)
--- Warning: Can only shrink size if column is empty!
-ALTER TABLE emp MODIFY ename VARCHAR2(20);
-
--- C. Rename a column
-ALTER TABLE emp RENAME COLUMN gender TO sex;
-
--- D. Drop a column (Deletes data in that column forever)
-ALTER TABLE emp DROP COLUMN sex;
-
--- 3. Truncate (The Factory Reset)
--- * Removes ALL rows.
--- * Resets High Water Mark (Storage).
--- * Faster than DELETE.
--- * Cannot be Rolled Back (DDL).
--- TRUNCATE TABLE emp; 
-
--- 4. Drop (The Demolition)
--- * Removes table structure AND data.
--- * Moves to Recycle Bin (in Oracle).
--- DROP TABLE emp;
--- DROP TABLE emp PURGE; (Skips Recycle Bin - Gone Forever)
-
-/* =============================================================
-   PART 2: DML (Data Manipulation Language) - The Data
-   * Not Auto-Committed (Can Rollback)
-   * Commands: INSERT, UPDATE, DELETE
-   ============================================================= */
-
--- 1. Insert Data (Adding Rows)
--- Best Practice: List columns explicitly to avoid errors if schema changes.
-INSERT INTO emp (empno, ename, sal, deptno) VALUES (7839, 'KING', 5000, 10);
-INSERT INTO emp VALUES (7698, 'BLAKE', 'MANAGER', 7839, '01-MAY-81', 2850, NULL, 30);
-
--- 2. Update Data (Modifying Rows)
--- Critical: Always use WHERE clause, or you update EVERY row!
-UPDATE emp SET sal = sal * 1.10 WHERE deptno = 10; -- 10% Hike
-
--- 3. Delete Data (Removing Rows)
--- Critical: Always use WHERE clause!
--- Slower than Truncate because it logs every row.
-DELETE FROM emp WHERE empno = 7698;
+-- 3. Adding Constraints LATER (Using ALTER)
+-- "I forgot to make empno the Primary Key!"
+ALTER TABLE emp ADD CONSTRAINT pk_emp PRIMARY KEY (empno);
+-- "I want to link deptno to the dept table now!"
+ALTER TABLE emp ADD CONSTRAINT fk_dept FOREIGN KEY (deptno) REFERENCES dept(deptno);
 
 /* =============================================================
-   PART 3: TCL (Transaction Control Language) - The Save Game
-   * Controls DML operations only.
+   PART 2: Database Objects (Views & Indexes)
+   Performance & Shortcuts
    ============================================================= */
 
--- 1. Commit (Save Game)
--- Saves all changes made since the last commit permanently.
-COMMIT;
+-- 1. Views (Virtual Table / Saved Query)
+-- Simple View (One table, no functions) - Can Update data through it.
+CREATE VIEW v_emp_dept10 AS
+SELECT * FROM emp WHERE deptno = 10;
 
--- 2. Rollback (Undo)
--- Undoes all changes made since the last commit.
--- Good for error handling (e.g., if Java code crashes).
-ROLLBACK;
+-- Complex View (Joins/Group By) - Read Only.
+CREATE VIEW v_dept_stats AS
+SELECT deptno, COUNT(*) as cnt, MAX(sal) as max_sal
+FROM emp
+GROUP BY deptno;
 
--- 3. Savepoint (Checkpoint)
--- Allows partial rollback.
-INSERT INTO emp VALUES (1, 'A', ...);
-SAVEPOINT s1;
-INSERT INTO emp VALUES (2, 'B', ...);
-ROLLBACK TO s1; -- Undoes 'B', but keeps 'A'.
-COMMIT; -- Saves 'A'.
+-- 2. Indexes (Performance Booster)
+-- Automatically created for Primary Key & Unique Key.
+-- Create manually for columns used in WHERE clauses often.
+CREATE INDEX idx_emp_ename ON emp(ename);
+-- Drop Index
+DROP INDEX idx_emp_ename;
+
+/* =============================================================
+   PART 3: DML & TCL (Managing Data)
+   ============================================================= */
+
+-- 1. Insert
+INSERT INTO dept VALUES (10, 'ACCOUNTING', 'NEW YORK');
+
+-- 2. Update
+UPDATE dept SET loc = 'BOSTON' WHERE deptno = 10;
+
+-- 3. Delete
+DELETE FROM dept WHERE deptno = 10;
+
+-- 4. Truncate (DDL - No Undo!)
+-- TRUNCATE TABLE emp;
+
+-- 5. Transactions
+COMMIT;    -- Save
+ROLLBACK;  -- Undo
+SAVEPOINT s1; -- Checkpoint
